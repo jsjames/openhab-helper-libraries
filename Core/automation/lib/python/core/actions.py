@@ -33,6 +33,7 @@ try:
     from org.openhab.core.model.script.actions import HTTP
     from org.openhab.core.model.script.actions import Ping
     from org.openhab.core.model.script.actions import ScriptExecution
+    from org.openhab.core.model.script.actions import Transformation
 except:
     from org.eclipse.smarthome.model.script.actions import Exec
     from org.eclipse.smarthome.model.script.actions import HTTP
@@ -41,6 +42,7 @@ except:
 
 try:
     # OH3
+    
     from org.openhab.core.model.script.actions import Log
     LogAction = Log
 except:
