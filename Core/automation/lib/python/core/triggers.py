@@ -740,7 +740,9 @@ class StartupTrigger(Trigger):
     """
     def __init__(self, trigger_name=None):
         trigger_name = validate_uid(trigger_name)
-        self.trigger = TriggerBuilder.create().withId(trigger_name).withTypeUID("jsr223.StartupTrigger").withConfiguration(Configuration()).build()
+        self.trigger = TriggerBuilder.create().withId(trigger_name).withTypeUID("core.SystemStartlevelTrigger").withConfiguration(Configuration({
+            "startlevel": 40
+        })).build()
 
 
 class DirectoryEventTrigger(Trigger):
