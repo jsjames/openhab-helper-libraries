@@ -66,6 +66,8 @@ def rule(name=None, description=None, tags=None):
                     self.description = class_.__doc__
                 if hasattr(self, "getEventTriggers"):
                     self.triggers = log_traceback(self.getEventTriggers)()
+                if hasattr(self, "getConditions"):
+                    self.conditions = log_traceback(self.getConditions)()
                 if tags is not None:
                     self.tags = set(tags)
             subclass = type(class_.__name__, (class_, SimpleRule), dict(__init__=init))
@@ -76,7 +78,7 @@ def rule(name=None, description=None, tags=None):
         else:
             callable_obj = new_rule
             if callable_obj.triggers.count(None) == 0:
-                simple_rule = _FunctionRule(callable_obj, callable_obj.triggers, name=name, description=description, tags=tags)
+                simple_rule = _FunctionRule(callable_obj, callable_obj.triggers, callable_obj.conditions if hasattr(callable_obj, "conditions") else None, name=name, description=description, tags=tags)
                 new_rule = addRule(simple_rule)
                 callable_obj.UID = new_rule.UID
                 callable_obj.triggers = None
@@ -87,8 +89,10 @@ def rule(name=None, description=None, tags=None):
     return rule_decorator
 
 class _FunctionRule(SimpleRule):
-    def __init__(self, callback, triggers, name=None, description=None, tags=None):
+    def __init__(self, callback, triggers, conditions, name=None, description=None, tags=None):
         self.triggers = triggers
+        if conditions is not None:
+            self.conditions = conditions
         if name is None:
             if hasattr(callback, '__name__'):
                 name = callback.__name__
@@ -126,21 +130,3 @@ def addRule(new_rule):
     """
     LOG.debug(u"Added rule '{}'".format(new_rule.name))
     return scriptExtension.get("automationManager").addRule(new_rule)
-
-# def set_uid_prefix(new_rule, prefix=None):
-#     """
-#     This function changes the UID of a rule, with the option to include a
-#     specified text.
-
-#     .. warning:: This function needs some attention in order to work with the
-#         Automation API changes included in S1319.
-
-#     Args:
-#         new_rule (Rule): the rule to modify
-#         prefix (str): (optional) the text to include in the UID
-#     """
-#     if prefix is None:
-#         prefix = type(new_rule).__name__
-#     uid_field = type(SmarthomeRule).getClass(SmarthomeRule).getDeclaredField(SmarthomeRule, "uid")
-#     uid_field.setAccessible(True)
-#     uid_field.set(new_rule, "{}-{}".format(prefix, str(UUID.randomUUID())))

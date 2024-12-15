@@ -9,7 +9,7 @@ this module can accept any of the following date types:
     java.time.LocalDateTime
     java.util.Calendar
     java.util.Date
-    org.joda.time.DateTime
+    org.joda.time.DateTime  # OH2 only
     datetime.datetime (Python)
     org.eclipse.smarthome.core.library.types.DateTimeType
     org.openhab.core.library.types.DateTimeType
@@ -20,27 +20,17 @@ __all__ = [
     "to_python_datetime", "to_joda_datetime", "human_readable_seconds"
 ]
 
-try:
-    import typing as t
-except:
-    pass
-
 import sys
 import datetime
 import inspect
 
-from core.log import getLogger
+from core.log import logging, LOG_PREFIX
 
 from java.time import LocalDateTime, ZonedDateTime
 from java.time import ZoneId, ZoneOffset
 from java.time.format import DateTimeFormatter
-from java.time.temporal import ChronoUnit
+from java.time.temporal.ChronoUnit import DAYS, HOURS, MINUTES, SECONDS
 from java.util import Calendar, Date, TimeZone
-
-DAYS = ChronoUnit.DAYS
-HOURS = ChronoUnit.HOURS
-MINUTES = ChronoUnit.MINUTES
-SECONDS = ChronoUnit.SECONDS
 
 try:
     from org.joda.time import DateTime as JodaDateTime
@@ -51,19 +41,20 @@ except:
     JodaDateTimeZone = None
 
 try:
-    # OH2.x compat1x or OH3
     from org.openhab.core.library.types import DateTimeType
-    from org.openhab.core.library.items import DateTimeItem
 except:
     DateTimeType = None
-    DateTimeItem = None
 
 try:
     from org.eclipse.smarthome.core.library.types import DateTimeType as EclipseDateTimeType
-    from org.eclipse.smarthome.core.library.items import DateTimeItem as EclipseDateTimeItem
 except:
     EclipseDateTimeType = None
-    EclipseDateTimeItem = None
+
+try:
+    # if the compat1x bundle is not installed, the OH 1.x DateTimeType is not available
+    from org.openhab.core.library.types import DateTimeType as LegacyDateTimeType
+except:
+    LegacyDateTimeType = None
 
 if 'org.eclipse.smarthome.automation' in sys.modules or 'org.openhab.core.automation' in sys.modules:
     # Workaround for Jython JSR223 bug where dates and datetimes are converted
@@ -75,8 +66,8 @@ if 'org.eclipse.smarthome.automation' in sys.modules or 'org.openhab.core.automa
     remove_java_converter(datetime.datetime)
 
 
+
 def format_date(value, format_string="yyyy-MM-dd'T'HH:mm:ss.SSxx"):
-    # type: (t.Any, str) -> str
     """
     Returns string of ``value`` formatted according to ``format_string``.
 
@@ -100,11 +91,10 @@ def format_date(value, format_string="yyyy-MM-dd'T'HH:mm:ss.SSxx"):
     Returns:
         str: the converted value
     """
-    return str(to_java_zoneddatetime(value).format(DateTimeFormatter.ofPattern(format_string)))
+    return to_java_zoneddatetime(value).format(DateTimeFormatter.ofPattern(format_string))
 
 
 def days_between(start_time, stop_time, calendar_days=False):
-    # type: (t.Any, t.Any, bool) -> int
     """
     Returns the number of days between ``start_time`` and ``stop_time``.
     Will return a negative number if ``start_time`` is after ``stop_time``.
@@ -130,7 +120,6 @@ def days_between(start_time, stop_time, calendar_days=False):
 
 
 def hours_between(start_time, stop_time):
-    # type: (t.Any, t.Any) -> int
     """
     Returns the number of hours between ``start_time`` and ``stop_time``.
     Will return a negative number if ``start_time`` is after ``stop_time``.
@@ -151,7 +140,6 @@ def hours_between(start_time, stop_time):
 
 
 def minutes_between(start_time, stop_time):
-    # type: (t.Any, t.Any) -> int
     """
     Returns the number of minutes between ``start_time`` and ``stop_time``.
     Will return a negative number if ``start_time`` is after ``stop_time``.
@@ -172,7 +160,6 @@ def minutes_between(start_time, stop_time):
 
 
 def seconds_between(start_time, stop_time):
-    # type: (t.Any, t.Any) -> int
     """
     Returns the number of seconds between ``start_time`` and ``stop_time``.
     Will return a negative number if ``start_time`` is after ``stop_time``.
@@ -193,7 +180,6 @@ def seconds_between(start_time, stop_time):
 
 
 def human_readable_seconds(seconds):
-    # type: (int) -> str
     """
     Converts seconds into a human readable string of days, hours, minutes and
     seconds.
@@ -238,7 +224,6 @@ def human_readable_seconds(seconds):
 
 
 def to_java_zoneddatetime(value):
-    # type: (t.Any) -> ZonedDateTime
     """
     Converts any of the supported date types to ``java.time.ZonedDateTime``. If
     ``value`` does not have timezone information, the system default will be
@@ -287,29 +272,20 @@ def to_java_zoneddatetime(value):
     # Joda DateTime
     if JodaDateTime and isinstance(value, JodaDateTime):
         return value.toGregorianCalendar().toZonedDateTime()
+    # openHAB DateTimeType
+    if DateTimeType and isinstance(value, DateTimeType):
+        return to_java_zoneddatetime(value.getZonedDateTime())
     # Eclipse Smarthome DateTimeType
     if EclipseDateTimeType and isinstance(value, EclipseDateTimeType):
         return to_java_zoneddatetime(value.calendar)
-    # openHAB 2.x compat1x or OH3
-    if DateTimeType and isinstance(value, DateTimeType):
-        if hasattr(value,"calendar"):
-            # compat1x
-            return to_java_zoneddatetime(value.calendar)
-        else:
-            # OH3
-            return value.getZonedDateTime()
-    # Eclipse Smarthome DateTimeItem
-    if EclipseDateTimeItem and isinstance(value, EclipseDateTimeItem):
-        return to_java_zoneddatetime(value.getState())
-    # openHAB DateTimeItem
-    if DateTimeItem and isinstance(value, DateTimeItem):
-        return to_java_zoneddatetime(value.getState())
+    # Legacy (OH1.x compat) DateTimeType
+    if LegacyDateTimeType and isinstance(value, LegacyDateTimeType):
+        return to_java_zoneddatetime(value.calendar)
 
     raise TypeError("Unknown type: {}".format(str(type(value))))
 
 
 def to_python_datetime(value):
-    # type: (t.Any) -> datetime.datetime
     """
     Converts any of the supported date types to Python ``datetime.datetime``.
     If ``value`` does not have timezone information, the system default will be
@@ -369,7 +345,6 @@ class _pythonTimezone(datetime.tzinfo):
 
 
 def to_joda_datetime(value):
-    # type: (t.Any) -> JodaDateTime
     """
     Converts any of the supported date types to ``org.joda.time.DateTime``. If
     ``value`` does not have timezone information, the system default will be
@@ -392,7 +367,7 @@ def to_joda_datetime(value):
     """
     if JodaDateTime is None:
         frame = inspect.stack()[1]
-        getLogger("date").warn(
+        logging.getLogger("{}.date".format(LOG_PREFIX)).warn(
             "'{func}' ({file}:{line}) called 'to_joda_datetime' but Joda is not available"
             .format(file=frame.filename, line=frame.lineno, func=frame.function)
         )
@@ -409,7 +384,6 @@ def to_joda_datetime(value):
 
 
 def to_java_calendar(value):
-    # type: (t.Any) -> Calendar
     """
     Converts any of the supported date types to ``java.util.Calendar``. If
     ``value`` does not have timezone information, the system default will be
